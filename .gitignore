@@ -1,4 +1,5 @@
 venv/
 ToneDetect_model/
 dataset/
-KakaoTalk_20250515_0053_22_930_유정유정/
+datasets/KakaoTalk_20250515_0053_22_930_유정유정/
+refiner/

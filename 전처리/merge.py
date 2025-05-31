@@ -80,8 +80,7 @@ def parse_kakao_txt_with_ordered_merge(filepath):
 # ✅ 새로 추가: pipeline용 run_merge()
 def run_merge(filepath):
     msgs = parse_kakao_txt_with_ordered_merge(filepath)
-    clean_sentences = [msg["text"] for msg in msgs]
-    return clean_sentences
+    return msgs
 
 # ✅ 테스트용
 if __name__ == "__main__":

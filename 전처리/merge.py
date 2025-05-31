@@ -77,7 +77,20 @@ def parse_kakao_txt_with_ordered_merge(filepath):
     result.sort(key=lambda x: (x["timestamp"], x["order"]))
     return result
 
-# ✅ 실행
-msgs = parse_kakao_txt_with_ordered_merge("datasets/KakaoTalk_20250515_0053_22_930_유정유정.txt")
-for msg in msgs:
-    print(f"{msg['timestamp']} {msg['speaker']} → {msg['text']}")
+# ✅ 새로 추가: pipeline용 run_merge()
+def run_merge(filepath):
+    msgs = parse_kakao_txt_with_ordered_merge(filepath)
+    clean_sentences = [msg["text"] for msg in msgs]
+    return clean_sentences
+
+# ✅ 테스트용
+if __name__ == "__main__":
+    clean_sentences = run_merge("datasets/KakaoTalk_20250515_0053_22_930_유정유정.txt")
+    for s in clean_sentences[:5]:
+        print(s)
+        
+# ✅ 실행 (직접 해당 파일을 실행할 때만 print 되도록 처리)
+if __name__ == "__main__":
+    msgs = parse_kakao_txt_with_ordered_merge("datasets/KakaoTalk_20250515_0053_22_930_유정유정.txt")
+    for msg in msgs:
+        print(f"{msg['timestamp']} {msg['speaker']} → {msg['text']}")

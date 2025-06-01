@@ -30,11 +30,6 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['GRAPH_FOLDER'] = 'static'
 
-# 앱 시작 시 오래된 그래프 제거 (옵션)
-old_graphs = glob.glob(os.path.join(app.config['GRAPH_FOLDER'], "*.png"))
-for old_file in old_graphs:
-    os.remove(old_file)
-
 # 모델 로드
 ADAPTER_PATH = "Models/ToneDetect_adapter"
 BASE_MODEL_NAME = "beomi/kcbert-base"
@@ -77,6 +72,11 @@ def index():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         file.save(filepath)
+        
+        ### ✅ ✅ 기존 그래프 삭제 (매번 분석 시작 시!)
+        old_graphs = glob.glob(os.path.join(app.config['GRAPH_FOLDER'], "*.png"))
+        for old_file in old_graphs:
+            os.remove(old_file)
 
         # merge
         msgs = merge.run_merge(filepath)

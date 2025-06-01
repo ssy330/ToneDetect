@@ -14,6 +14,11 @@ from peft import PeftModel
 import uuid
 import glob
 
+# ✅ 진행률 저장용 (전역)
+progress_data = {
+    "progress": 0
+}
+
 plt.rcParams['font.family'] = 'AppleGothic'
 
 # 전처리 모듈 경로 추가
@@ -75,15 +80,23 @@ def index():
 
         # merge
         msgs = merge.run_merge(filepath)
+        
+        # ✅ 분석 시작 시 진행률 초기화
+        progress_data["progress"] = 0
 
         # 분석
         speaker_style_counts = defaultdict(lambda: defaultdict(int))
-        for msg in msgs:
+        total_msgs = len(msgs)
+
+        for idx, msg in enumerate(msgs):
             speaker = msg['speaker']
             text = msg['text']
             pred = predict_style(text)
             style_name = label_map[pred]
             speaker_style_counts[speaker][style_name] += 1
+
+            # ✅ 진행률 업데이트
+            progress_data["progress"] = int((idx + 1) / total_msgs * 100)
 
         # DataFrame 변환
         data = []
@@ -136,11 +149,19 @@ def index():
         plt.tight_layout()
         plt.savefig(graph_path)
         plt.close()
+        
+        # ✅ 최종 진행률 100%로 설정 (완료 표시)
+        progress_data["progress"] = 100
 
     return render_template('index.html',
                            table_html=table_html,
                            top_styles=top_styles,
                            graph_filename=graph_filename)
+    
+# ✅ 진행률 조회용 route 추가
+@app.route('/progress', methods=['GET'])
+def progress():
+    return {"progress": progress_data["progress"]}
 
 # 실행
 if __name__ == '__main__':

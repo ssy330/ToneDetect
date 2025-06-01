@@ -49,6 +49,18 @@
         <div id="loading" style="display: none; margin-top: 20px; font-size: 18px; color: #555;">
             분석 중... ↻ 잠시만 기다려주세요!
         </div>
+
+        <!-- 🟢 Progress Bar -->
+        <div id="progressContainer" style="display:none; margin-top: 20px;">
+            <div style="width: 100%; background-color: #f3f3f3; border-radius: 5px;">
+                <div id="progressBar" 
+                    style="width:0%; height: 20px; background-color: #4CAF50; border-radius: 5px;
+                           transition: width 0.3s ease;">
+                </div>
+            </div>
+            <p id="progressText" style="margin-top: 5px;">진행률: 0%</p>
+            <p id="etaText" style="margin-top: 5px; color: #888;">예상 남은 시간: 계산 중...</p>
+        </div>
         <br><br>
 
         {% if error %}
@@ -80,8 +92,53 @@
     <!-- 🟢 JS 함수 -->
     <script>
         function showLoading() {
-            document.getElementById('loading').style.display = 'block';
-        }
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('progressContainer').style.display = 'block';
+        startProgressPolling();
+    }
+
+    function startProgressPolling() {
+        let startTime = Date.now();
+        let etaHistory = [];  // 🟢 ETA 기록 리스트
+
+        const interval = setInterval(() => {
+            fetch('/progress')
+                .then(response => response.json())
+                .then(data => {
+                    const progress = data.progress;
+                    document.getElementById('progressBar').style.width = progress + '%';
+                    document.getElementById('progressText').innerText = `진행률: ${progress}%`;
+
+                    // 🟢 ETA 계산
+                    const elapsedSec = (Date.now() - startTime) / 1000;
+                    if (progress === 0) {
+                        document.getElementById('etaText').innerText = `예상 남은 시간: 계산 중...`;
+                    }
+                    if (progress > 0 && progress < 100) {
+                        const estimatedTotalSec = elapsedSec / (progress / 100);
+                        const remainingSec = estimatedTotalSec - elapsedSec;
+
+                        // 기록 추가 (가장 최신값 추가)
+                        etaHistory.push(remainingSec);
+
+                        // 최대 5개까지만 유지 (최근 5개)
+                        if (etaHistory.length > 5) {
+                            etaHistory.shift();  // 가장 오래된 것 제거
+                        }
+
+                        // 평균 ETA 계산
+                        const avgRemainingSec = etaHistory.reduce((a, b) => a + b, 0) / etaHistory.length;
+
+                        const min = Math.floor(avgRemainingSec / 60);
+                        const sec = Math.floor(avgRemainingSec % 60);
+                        document.getElementById('etaText').innerText = `예상 남은 시간: ${min}분 ${sec}초`;
+                    } else if (progress >= 100) {
+                        document.getElementById('etaText').innerText = `예상 남은 시간: 완료됨 🎉`;
+                        clearInterval(interval);  // 완료 시 polling 중단
+                    }
+                });
+        }, 200);  // 0.2초마다 polling
+    }
     </script>
 </body>
 </html>

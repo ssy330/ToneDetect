@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>카카오톡 말투 분석기</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            text-align: center;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+        .dataframe {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .dataframe th, .dataframe td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: center;
+        }
+        .dataframe th {
+            background-color: #f2f2f2;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>카카오톡 말투 분석기</h1>
+
+        <!-- 🟢 업로드 폼 -->
+        <form method="POST" enctype="multipart/form-data" onsubmit="showLoading()">
+            <input type="file" name="file" accept=".txt">
+            <button type="submit" style="padding: 8px 16px; background-color: #4CAF50; color: white; border: none; cursor: pointer;">
+                업로드 & 분석 시작
+            </button>
+        </form>
+
+        <!-- 🟢 분석 중 표시 (처음에는 숨김) -->
+        <div id="loading" style="display: none; margin-top: 20px; font-size: 18px; color: #555;">
+            분석 중... ↻ 잠시만 기다려주세요!
+        </div>
+        <br><br>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if top_styles %}
+        <h2>📝 화자별 가장 많이 사용한 말투</h2>
+        <ul style="list-style: none; padding: 0;">
+            {% for speaker, top_style in top_styles.items() %}
+            <li><strong>{{ speaker }}</strong>: {{ top_style }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <br>
+
+        {% if table_html %}
+        <h2>📊 분석 결과 (표)</h2>
+        {{ table_html | safe }}
+        {% endif %}
+        <br>
+
+        {% if graph_filename %}
+        <h2>📈 분석 결과 (그래프)</h2>
+        <img src="{{ url_for('static', filename=graph_filename) }}" style="max-width: 100%; height: auto;">
+        {% endif %}
+    </div>
+
+    <!-- 🟢 JS 함수 -->
+    <script>
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

@@ -1,2 +1,3 @@
 venv/
 Models/pko-t5-finetuned
+.env

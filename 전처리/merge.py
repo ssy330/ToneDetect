@@ -12,8 +12,14 @@ def parse_time(date_str, period, hour, minute):
     return dt.replace(hour=hour, minute=int(minute))
 
 def is_sentence_end(text):
-    return bool(re.search(r"(?:[.!?ㅋㅎㅠㅜ~]){1,}$", text.strip()))
+    if bool(re.search(r"(?:[.!?ㅋㅎㅠㅜ~;]){1,}$", text.strip())):
+        return True
 
+    if text.endswith("요") or text.endswith("임") or text.endswith("함"):
+        return True
+    
+    return False
+    
 def parse_kakao_txt_with_ordered_merge(filepath):
     with open(filepath, encoding="utf-8") as f:
         lines = f.readlines()[2:]
@@ -47,7 +53,7 @@ def parse_kakao_txt_with_ordered_merge(filepath):
         if prev:
             prev_time, prev_text, prev_order = prev
             gap = (timestamp - prev_time).total_seconds()
-            if gap <= 30 and not is_sentence_end(prev_text):
+            if gap <= 10 and not is_sentence_end(prev_text):
                 # 병합
                 merged = prev_text + " " + utterance
                 buffer[speaker] = (timestamp, merged, prev_order)
@@ -81,15 +87,9 @@ def parse_kakao_txt_with_ordered_merge(filepath):
 def run_merge(filepath):
     msgs = parse_kakao_txt_with_ordered_merge(filepath)
     return msgs
-
-# ✅ 테스트용
-if __name__ == "__main__":
-    clean_sentences = run_merge("datasets/KakaoTalk_20250515_0053_22_930_유정유정.txt")
-    for s in clean_sentences[:5]:
-        print(s)
         
 # ✅ 실행 (직접 해당 파일을 실행할 때만 print 되도록 처리)
 if __name__ == "__main__":
-    msgs = parse_kakao_txt_with_ordered_merge("datasets/KakaoTalk_20250515_0053_22_930_유정유정.txt")
+    msgs = parse_kakao_txt_with_ordered_merge("uploads/KakaoTalk_20250515_0053_22_930_유정유정.txt")
     for msg in msgs:
         print(f"{msg['timestamp']} {msg['speaker']} → {msg['text']}")

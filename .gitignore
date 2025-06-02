@@ -1,5 +1,2 @@
 venv/
-ToneDetect_base/
-dataset/
-datasets/KakaoTalk_20250515_0053_22_930_유정유정/
-refiner/
+Models/pko-t5-finetuned

@@ -31,45 +31,119 @@
             margin-top: 10px;
             font-weight: bold;
         }
+
+        /* Tooltip 스타일 */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 260px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            padding: 8px;
+            border-radius: 6px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 13px;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* 카드 스타일 (Bootstrap 없어도 최소한의 레이아웃) */
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .card-header {
+            background-color: #f7f7f7;
+            padding: 10px 15px;
+            font-weight: bold;
+            border-bottom: 1px solid #ddd;
+        }
+        .card-body {
+            padding: 15px;
+        }
+        .card-body h5 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .card-body ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .card-body li {
+            margin-bottom: 6px;
+        }
+        .card-body li .example {
+            color: #555;
+            font-size: 14px;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>카카오톡 말투 분석기</h1>
 
-        <!-- 🟢 업로드 폼 -->
+        <!-- 업로드 폼 -->
         <form method="POST" enctype="multipart/form-data" onsubmit="showLoading()">
+            <!-- 툴팁 추가 (물음표 아이콘) -->
+            <span class="tooltip">
+                <img src="{{ url_for('static', filename='icons/exclamation.png') }}" 
+                     alt="info" style="width: 20px; vertical-align: middle; cursor: pointer;">
+                <span class="tooltiptext">
+                  카카오톡 채팅방 우클릭 → 내보내기 → 파일 수정 없이 그대로 업로드!
+                </span>
+            </span>
+
             <input type="file" name="file" accept=".txt">
-            <button type="submit" style="padding: 8px 16px; background-color: #4CAF50; color: white; border: none; cursor: pointer;">
-                업로드 & 분석 시작
+            <button type="submit" 
+                    style="padding: 8px 16px; background-color: #4CAF50; color: white; border: none; cursor: pointer;">
+              업로드 & 분석 시작
             </button>
         </form>
 
-        <!-- 🟢 분석 중 표시 (처음에는 숨김) -->
+        <!-- 분석 중 표시 -->
         <div id="loading" style="display: none; margin-top: 20px; font-size: 18px; color: #555;">
             분석 중... ↻ 잠시만 기다려주세요!
         </div>
 
-        <!-- 🟢 Progress Bar -->
+        <!-- Progress Bar -->
         <div id="progressContainer" style="display:none; margin-top: 20px;">
             <div style="width: 100%; background-color: #f3f3f3; border-radius: 5px;">
                 <div id="progressBar" 
-                    style="width:0%; height: 20px; background-color: #4CAF50; border-radius: 5px;
-                           transition: width 0.3s ease;">
+                     style="width:0%; height: 20px; background-color: #4CAF50; border-radius: 5px;
+                            transition: width 0.3s ease;">
                 </div>
             </div>
             <p id="progressText" style="margin-top: 5px;">진행률: 0%</p>
             <p id="etaText" style="margin-top: 5px; color: #888;">예상 남은 시간: 계산 중...</p>
         </div>
-        <br><br>
+
+        <br>
 
         {% if error %}
         <div class="error">{{ error }}</div>
         {% endif %}
 
+
+        <!-- 화자별 가장 많이 사용한 말투 -->
         {% if top_styles %}
         <h2>📝 화자별 가장 많이 사용한 말투</h2>
-        <ul style="list-style: none; padding: 0;">
+        <ul style="list-style: none; padding-left: 0;">
             {% for speaker, top_style in top_styles.items() %}
             <li><strong>{{ speaker }}</strong>: {{ top_style }}</li>
             {% endfor %}
@@ -77,68 +151,107 @@
         {% endif %}
         <br>
 
+
+        <!-- 분석 결과 표 -->
         {% if table_html %}
         <h2>📊 분석 결과 (표)</h2>
         {{ table_html | safe }}
         {% endif %}
         <br>
 
+
+        <!-- 분석 결과 그래프 -->
         {% if graph_filename %}
         <h2>📈 분석 결과 (그래프)</h2>
         <img src="{{ url_for('static', filename=graph_filename) }}" style="max-width: 100%; height: auto;">
         {% endif %}
+        <br>
+
+
+        <!-- 화자별 감정 문자열 / 이모티콘 -->
+        {% if speaker_stats %}
+        <h2>🗣️ 화자별 감정 표현 / 이모티콘 분석 결과</h2>
+
+        {% for speaker, stats in speaker_stats.items() %}
+        <div class="card">
+            <div class="card-header">
+                🗣️ 화자: {{ speaker }}
+            </div>
+            <div class="card-body">
+                <!-- 감정 표현 문자열 -->
+                <h5>🔸 가장 많이 쓴 감정 표현 문자열 (emotion_chunks):</h5>
+                <ul>
+                    {% for item in stats.emotion_chunks %}
+                    <li>«{{ item.chunk }}»: {{ item.count }}회
+                        <ul>
+                            {% for ex in item.examples %}
+                            <!-- 예시 문장에는 original_text가 이미 포함되어 있기 때문에 그대로 출력 -->
+                            <li class="example">예시: {{ ex }}</li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                    {% endfor %}
+                </ul>
+
+                <!-- 이모티콘 -->
+                <h5>🔸 가장 많이 쓴 이모티콘 (extracted_emoticons):</h5>
+                <ul>
+                    {% for item in stats.extracted_emoticons %}
+                    <li>{{ item.emoji }}: {{ item.count }}회
+                        <ul>
+                            {% for ex in item.examples %}
+                            <li class="example">예시: {{ ex }}</li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
     </div>
 
-    <!-- 🟢 JS 함수 -->
+    <!-- JS 함수(로딩, Progress Polling) -->
     <script>
         function showLoading() {
-        document.getElementById('loading').style.display = 'block';
-        document.getElementById('progressContainer').style.display = 'block';
-        startProgressPolling();
-    }
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('progressContainer').style.display = 'block';
+            startProgressPolling();
+        }
 
-    function startProgressPolling() {
-        let startTime = Date.now();
-        let etaHistory = [];  // 🟢 ETA 기록 리스트
+        function startProgressPolling() {
+            let startTime = Date.now();
+            let etaHistory = [];
 
-        const interval = setInterval(() => {
-            fetch('/progress')
-                .then(response => response.json())
-                .then(data => {
-                    const progress = data.progress;
-                    document.getElementById('progressBar').style.width = progress + '%';
-                    document.getElementById('progressText').innerText = `진행률: ${progress}%`;
+            const interval = setInterval(() => {
+                fetch('/progress')
+                    .then(response => response.json())
+                    .then(data => {
+                        const progress = data.progress;
+                        document.getElementById('progressBar').style.width = progress + '%';
+                        document.getElementById('progressText').innerText = `진행률: ${progress}%`;
 
-                    // 🟢 ETA 계산
-                    const elapsedSec = (Date.now() - startTime) / 1000;
-                    if (progress === 0) {
-                        document.getElementById('etaText').innerText = `예상 남은 시간: 계산 중...`;
-                    }
-                    if (progress > 0 && progress < 100) {
-                        const estimatedTotalSec = elapsedSec / (progress / 100);
-                        const remainingSec = estimatedTotalSec - elapsedSec;
-
-                        // 기록 추가 (가장 최신값 추가)
-                        etaHistory.push(remainingSec);
-
-                        // 최대 5개까지만 유지 (최근 5개)
-                        if (etaHistory.length > 5) {
-                            etaHistory.shift();  // 가장 오래된 것 제거
+                        const elapsedSec = (Date.now() - startTime) / 1000;
+                        if (progress > 0 && progress < 100) {
+                            const estimatedTotalSec = elapsedSec / (progress / 100);
+                            const remainingSec = estimatedTotalSec - elapsedSec;
+                            etaHistory.push(remainingSec);
+                            if (etaHistory.length > 5) etaHistory.shift();
+                            const avgRemaining = etaHistory.reduce((a, b) => a + b, 0) / etaHistory.length;
+                            const min = Math.floor(avgRemaining / 60);
+                            const sec = Math.floor(avgRemaining % 60);
+                            document.getElementById('etaText').innerText = 
+                                `예상 남은 시간: ${min}분 ${sec}초`;
+                        } else if (progress >= 100) {
+                            document.getElementById('etaText').innerText = `예상 남은 시간: 완료됨 🎉`;
+                            clearInterval(interval);
+                        } else {
+                            document.getElementById('etaText').innerText = `예상 남은 시간: 계산 중...`;
                         }
-
-                        // 평균 ETA 계산
-                        const avgRemainingSec = etaHistory.reduce((a, b) => a + b, 0) / etaHistory.length;
-
-                        const min = Math.floor(avgRemainingSec / 60);
-                        const sec = Math.floor(avgRemainingSec % 60);
-                        document.getElementById('etaText').innerText = `예상 남은 시간: ${min}분 ${sec}초`;
-                    } else if (progress >= 100) {
-                        document.getElementById('etaText').innerText = `예상 남은 시간: 완료됨 🎉`;
-                        clearInterval(interval);  // 완료 시 polling 중단
-                    }
-                });
-        }, 200);  // 0.2초마다 polling
-    }
+                    });
+            }, 200);
+        }
     </script>
 </body>
 </html>

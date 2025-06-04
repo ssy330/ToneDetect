@@ -78,18 +78,33 @@ def parse_kakao_txt_with_ordered_merge(filepath):
     return result
 
 # ✅ 새로 추가: pipeline용 run_merge()
-def run_merge(filepath):
-    msgs = parse_kakao_txt_with_ordered_merge(filepath)
-    return msgs
+def run_merge(msgs):
+    # 예시: 화자별로 flatten 처리
+    merged_msgs = []
+    for msg in msgs:
+        merged_msg = {
+            "speaker": msg["speaker"],
+            "text": msg["text"]
+        }
+        merged_msgs.append(merged_msg)
+    return merged_msgs
 
 # ✅ 테스트용
 if __name__ == "__main__":
-    clean_sentences = run_merge("datasets/KakaoTalk_20250515_0053_22_930_유정유정.txt")
+    filepath = "datasets/KakaoTalk_20250515_0053_22_930_유정유정.txt"
+
+    # 1️⃣ 파싱 단계
+    msgs = parse_kakao_txt_with_ordered_merge(filepath)
+
+    # 2️⃣ run_merge 실행
+    clean_sentences = run_merge(msgs)
+
+    # 3️⃣ 출력
     for s in clean_sentences[:5]:
         print(s)
-        
-# ✅ 실행 (직접 해당 파일을 실행할 때만 print 되도록 처리)
-if __name__ == "__main__":
-    msgs = parse_kakao_txt_with_ordered_merge("datasets/KakaoTalk_20250515_0053_22_930_유정유정.txt")
-    for msg in msgs:
+
+    # 추가 테스트: 원본 메시지 출력
+    print("\n--- 원본 parse 결과 ---")
+    for msg in msgs[:5]:
+        print(f"{msg['timestamp']} {msg['speaker']} → {msg['text']}")
         print(f"{msg['timestamp']} {msg['speaker']} → {msg['text']}")

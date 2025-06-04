@@ -73,6 +73,19 @@ def preprocess_text(text):
         "text_input": text_input,
         "emotion_chunks": emotion_classified
     }
+    
+# pipeline 에서 호출할 run_emotion 정의
+def run_emotion(msgs):
+    for msg in msgs:
+        text = msg["text"]
+        result = preprocess_text(text)
+        msg["text"] = result["text_input"]
+        msg["emotion_chunks"] = result["emotion_chunks"]
+        
+        # ✅ 디버그 출력
+        print(f"[run_emotion] speaker={msg['speaker']}, emotion_chunks={msg['emotion_chunks']}")
+
+    return msgs
 
 # 테스트
 if __name__ == "__main__":

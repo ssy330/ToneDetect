@@ -59,13 +59,31 @@
             opacity: 1;
         }
 
-        /* 카드 스타일 (Bootstrap 없어도 최소한의 레이아웃) */
+        /* ─── 카드 레이아웃 변경: 카드들을 나란히 놓는 래퍼 ─── */
+        .cards-wrapper {
+            display: flex;
+            flex-wrap: wrap;          /* 화면이 좁으면 자동으로 다음 줄로 넘어가도록 */
+            justify-content: space-between;
+            gap: 20px;                /* 카드 사이 여백 */
+        }
+
         .card {
             border: 1px solid #ddd;
             border-radius: 6px;
+            /* 기존 margin을 위아래 20px 정도만 유지하고 
+               좌우 마진은 flex gap 으로 처리 */
             margin: 20px 0;
             text-align: left;
+            background-color: #fff;
+            /* 카드 너비를 48% 정도로 잡으면 
+               두 개씩 한 줄에 보여지면서, 
+               화면이 좁아지면 자동으로 줄바꿈(flex-wrap) */
+            width: 48%;
+            box-sizing: border-box;   
+            /* 그림자 효과(선택 사항) */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+
         .card-header {
             background-color: #f7f7f7;
             padding: 10px 15px;
@@ -91,6 +109,32 @@
             color: #555;
             font-size: 14px;
             margin-left: 10px;
+        }
+
+        /* 화면이 아주 좁을 때(예: 모바일) 카드가 한 줄에 하나만 나오도록 해도 좋습니다. */
+        @media (max-width: 600px) {
+            .card {
+                width: 100%;
+            }
+        }
+
+        /* ─── 워드클라우드용 스타일 ─── */
+        .wordcloud-section {
+            margin-top: 40px;
+            text-align: center;
+        }
+        .wordcloud-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .wordcloud-container img {
+            max-width: 280px;
+            height: auto;
+            border: 1px solid #ccc;
+            border-radius: 6px;
         }
     </style>
 </head>
@@ -139,7 +183,6 @@
         <div class="error">{{ error }}</div>
         {% endif %}
 
-
         <!-- 화자별 가장 많이 사용한 말투 -->
         {% if top_styles %}
         <h2>📝 화자별 가장 많이 사용한 말투</h2>
@@ -151,14 +194,12 @@
         {% endif %}
         <br>
 
-
         <!-- 분석 결과 표 -->
         {% if table_html %}
         <h2>📊 분석 결과 (표)</h2>
         {{ table_html | safe }}
         {% endif %}
         <br>
-
 
         <!-- 분석 결과 그래프 -->
         {% if graph_filename %}
@@ -167,49 +208,81 @@
         {% endif %}
         <br>
 
-
-        <!-- 화자별 감정 문자열 / 이모티콘 -->
+        <!-- ──────────────────────────────────────────────────── -->
+        <!-- 화자별 감정 표현 / 이모티콘 분석 결과 (카드들을 나란히 배치) -->
         {% if speaker_stats %}
         <h2>🗣️ 화자별 감정 표현 / 이모티콘 분석 결과</h2>
 
-        {% for speaker, stats in speaker_stats.items() %}
-        <div class="card">
-            <div class="card-header">
-                🗣️ 화자: {{ speaker }}
-            </div>
-            <div class="card-body">
-                <!-- 감정 표현 문자열 -->
-                <h5>🔸 가장 많이 쓴 감정 표현 문자열 (emotion_chunks):</h5>
-                <ul>
-                    {% for item in stats.emotion_chunks %}
-                    <li>«{{ item.chunk }}»: {{ item.count }}회
-                        <ul>
-                            {% for ex in item.examples %}
-                            <!-- 예시 문장에는 original_text가 이미 포함되어 있기 때문에 그대로 출력 -->
-                            <li class="example">예시: {{ ex }}</li>
-                            {% endfor %}
-                        </ul>
-                    </li>
-                    {% endfor %}
-                </ul>
+        <!-- ① cards-wrapper로 카드 전체를 감싸기 -->
+        <div class="cards-wrapper">
+            {% for speaker, stats in speaker_stats.items() %}
+            <div class="card">
+                <div class="card-header">
+                    🗣️ 화자: {{ speaker }}
+                </div>
+                <div class="card-body">
+                    <!-- 감정 표현 문자열 -->
+                    <h5>🔸 가장 많이 쓴 감정 표현 문자열 (emotion_chunks):</h5>
+                    <ul>
+                        {% for item in stats.emotion_chunks %}
+                        <li>«{{ item.chunk }}»: {{ item.count }}회
+                            <ul>
+                                {% for ex in item.examples %}
+                                <li class="example">예시: {{ ex }}</li>
+                                {% endfor %}
+                            </ul>
+                        </li>
+                        {% endfor %}
+                    </ul>
 
-                <!-- 이모티콘 -->
-                <h5>🔸 가장 많이 쓴 이모티콘 (extracted_emoticons):</h5>
-                <ul>
-                    {% for item in stats.extracted_emoticons %}
-                    <li>{{ item.emoji }}: {{ item.count }}회
-                        <ul>
-                            {% for ex in item.examples %}
-                            <li class="example">예시: {{ ex }}</li>
-                            {% endfor %}
-                        </ul>
-                    </li>
-                    {% endfor %}
-                </ul>
+                    <!-- 이모티콘 -->
+                    <h5>🔸 가장 많이 쓴 이모티콘 (extracted_emoticons):</h5>
+                    <ul>
+                        {% for item in stats.extracted_emoticons %}
+                        <li>{{ item.emoji }}: {{ item.count }}회
+                            <ul>
+                                {% for ex in item.examples %}
+                                <li class="example">예시: {{ ex }}</li>
+                                {% endfor %}
+                            </ul>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <br>
+
+        <!-- LDA 토픽 분석 결과 출력 섹션 -->
+        <!-- {% if lda_topics %}
+        <h2>📌 LDA 토픽 분석 결과</h2>
+        <ol style="text-align:left; max-width:700px; margin:auto;">
+            {% for topic in lda_topics %}
+            <li>
+                <strong>토픽 {{ topic.topic_id }}:</strong>
+                {{ topic.keywords }}
+            </li>
+            {% endfor %}
+        </ol>
+        {% endif %}
+        <br> -->
+
+        <!-- 워드클라우드 출력 섹션 -->
+        {% if wc_filenames %}
+        <div class="wordcloud-section">
+            <h2>🧠 토픽별 워드클라우드</h2>
+            <div class="wordcloud-container">
+                {% for fname in wc_filenames %}
+                <div>
+                    <img src="{{ url_for('static', filename=fname) }}" alt="WordCloud 토픽 이미지">
+                </div>
+                {% endfor %}
             </div>
         </div>
-        {% endfor %}
         {% endif %}
+
     </div>
 
     <!-- JS 함수(로딩, Progress Polling) -->
@@ -221,8 +294,9 @@
         }
 
         function startProgressPolling() {
-            let startTime = Date.now();
-            let etaHistory = [];
+            const startTime = Date.now();
+            const etaHistory = [];
+            const MIN_PROGRESS_TO_CALC_ETA = 5;    // 5% 이하일 땐 ETA 계산 안 함
 
             const interval = setInterval(() => {
                 fetch('/progress')
@@ -233,21 +307,49 @@
                         document.getElementById('progressText').innerText = `진행률: ${progress}%`;
 
                         const elapsedSec = (Date.now() - startTime) / 1000;
-                        if (progress > 0 && progress < 100) {
-                            const estimatedTotalSec = elapsedSec / (progress / 100);
-                            const remainingSec = estimatedTotalSec - elapsedSec;
-                            etaHistory.push(remainingSec);
-                            if (etaHistory.length > 5) etaHistory.shift();
-                            const avgRemaining = etaHistory.reduce((a, b) => a + b, 0) / etaHistory.length;
-                            const min = Math.floor(avgRemaining / 60);
-                            const sec = Math.floor(avgRemaining % 60);
-                            document.getElementById('etaText').innerText = 
-                                `예상 남은 시간: ${min}분 ${sec}초`;
-                        } else if (progress >= 100) {
+
+                        // 1) progress가 MIN_PROGRESS_TO_CALC_ETA(%) 이하이면 "계산 중"만 보여주기
+                        if (progress <= MIN_PROGRESS_TO_CALC_ETA) {
+                            document.getElementById('etaText').innerText = `예상 남은 시간: 계산 중...`;
+                        }
+                        // 2) progress가 100%이면 완료 처리 + clearInterval
+                        else if (progress >= 100) {
                             document.getElementById('etaText').innerText = `예상 남은 시간: 완료됨 🎉`;
                             clearInterval(interval);
-                        } else {
-                            document.getElementById('etaText').innerText = `예상 남은 시간: 계산 중...`;
+                        }
+                        // 3) 그 외(5~99% 구간)에는 ETA 계산
+                        else {
+                            // (a) 전체 예상 시간 추정
+                            const estimatedTotalSec = elapsedSec / (progress / 100);
+                            let remainingSec = estimatedTotalSec - elapsedSec;
+
+                            // (b) 매 사이클마다 너무 큰 변동이 있으면 이전 ETA를 사용하거나 clamp
+                            //    예: 직전 ETA와 2배 이상 차이가 나면 이전 ETA로 고정
+                            if (etaHistory.length > 0) {
+                                const prev = etaHistory[etaHistory.length - 1];
+                                // 허용 비율: 직전 ETA의 0.5~2배 사이만 허용
+                                if (remainingSec > prev * 2) {
+                                    remainingSec = prev * 1.2;  // 너무 커지면 직전 값의 120%로 제한
+                                }
+                                else if (remainingSec < prev * 0.5) {
+                                    remainingSec = prev * 0.8;  // 너무 작아지면 직전 값의 80%로 제한
+                                }
+                            }
+
+                            // (c) etaHistory에 넣고, 최대 5개까지만 유지 (최신 5회)
+                            etaHistory.push(remainingSec);
+                            if (etaHistory.length > 5) {
+                                etaHistory.shift();
+                            }
+
+                            // (d) 평균 ETA 계산 (최근 5회)
+                            const sum = etaHistory.reduce((a, b) => a + b, 0);
+                            const avgRemainingSec = sum / etaHistory.length;
+
+                            const min = Math.floor(avgRemainingSec / 60);
+                            const sec = Math.floor(avgRemainingSec % 60);
+                            document.getElementById('etaText').innerText = 
+                                `예상 남은 시간: ${min}분 ${sec}초`;
                         }
                     });
             }, 200);

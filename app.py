@@ -11,6 +11,15 @@ from flask import Flask, render_template, request
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from peft import PeftModel
 
+# ─────────── 여기에 LDA용 라이브러리 추가 ───────────
+from konlpy.tag import Okt
+from gensim import corpora
+from gensim.models import LdaModel
+
+
+# ───────── 워드클라우드 관련 라이브러리 추가 ─────────
+from wordcloud import WordCloud
+
 sys.path.append(os.path.join(os.getcwd(), "전처리"))
 
 # 전처리 모듈 import
@@ -31,6 +40,46 @@ plt.rcParams['font.family'] = 'AppleGothic'
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['GRAPH_FOLDER'] = 'static'
+
+# ───────── 워드클라우드용 기본 설정 ─────────
+# Mac: 기본 AppleGothic, Windows: 'C:/Windows/Fonts/malgun.ttf' 등 환경에 맞게 수정하세요.
+FONT_PATH = '/Library/Fonts/AppleGothic.ttf'
+
+def generate_topic_wordclouds(lda_model, dictionary, num_topics=5, topn=30):
+    """
+    lda_model: gensim.models.LdaModel 객체
+    dictionary: LDA 학습에 사용된 Gensim Dictionary
+    num_topics: 워드클라우드로 만들 토픽 개수
+    topn: 토픽별 상위 몇 개 단어를 워드클라우드에 반영할지
+    반환값: 만든 이미지 파일명 리스트 (예: ['topic_1.png', 'topic_2.png', ...])
+    """
+    # 'static/wordclouds' 폴더를 만들어두고, 그곳에 이미지를 저장하겠습니다.
+    wc_folder = os.path.join(app.config['GRAPH_FOLDER'], 'wordclouds')
+    os.makedirs(wc_folder, exist_ok=True)
+
+    filenames = []
+    for topic_id in range(num_topics):
+        # 각 토픽에서 topn 단어+가중치 추출
+        topic_terms = lda_model.show_topic(topic_id, topn=topn)
+        # 예: [("단어1", 0.05), ("단어2", 0.03), ...]
+        freq_dict = {word: float(weight) for word, weight in topic_terms}
+
+        # 워드클라우드 생성
+        wc = WordCloud(
+            background_color='white',
+            font_path=FONT_PATH,
+            width=800,
+            height=400
+        ).generate_from_frequencies(freq_dict)
+
+        # 파일명 예시: 'topic_1.png', 'topic_2.png', ...
+        file_name = f"topic_{topic_id+1}.png"
+        save_path = os.path.join(wc_folder, file_name)
+
+        # pyplot 없이 직접 저장
+        wc.to_file(save_path)
+        filenames.append(os.path.join('wordclouds', file_name))  # 템플릿에서 사용할 경로 (static/wordclouds/...)
+    return filenames
 
 # 모델 로드
 ADAPTER_PATH = "Models/ToneDetect_adapter"
@@ -66,6 +115,9 @@ def index():
     top_styles = None
     graph_filename = None
     speaker_stats = None
+    lda_topics    = None  # LDA 토픽 결과를 담을 변수
+    wc_filenames   = None  # 워드클라우드 이미지 파일명을 담을 리스트
+
 
     if request.method == 'POST':
         file = request.files['file']
@@ -84,6 +136,13 @@ def index():
         old_graphs = glob.glob(os.path.join(app.config['GRAPH_FOLDER'], "*.png"))
         for old_file in old_graphs:
             os.remove(old_file)
+            
+        # (2) static/wordclouds 폴더가 있다면, 그 안의 PNG도 전부 삭제
+        wc_folder = os.path.join(app.config['GRAPH_FOLDER'], 'wordclouds')
+        if os.path.isdir(wc_folder):
+            old_wcs = glob.glob(os.path.join(wc_folder, "*.png"))
+            for old_wc in old_wcs:
+                os.remove(old_wc)
             
         # ──────────────── 전처리 파이프라인 실행(단계별로) ────────────────
         # 🔸🔸 단계별 호출 시작 🔸🔸
@@ -230,8 +289,111 @@ def index():
         import pprint
         pprint.pprint(speaker_stats)
         
-        msgs = run_merge(msgs)
+        merged_msgs = run_merge(msgs)
+
+        # ───────────── run_merge 직후 디버깅 코드 시작 ─────────────
+        print("▶ run_merge() 후 merged_msgs 샘플 (총 개수:", len(merged_msgs), "개)")
+
+        import pprint
+        pprint.pprint(merged_msgs[:5])
+
+        print("\n▶ run_merge() 후 merged_msgs 각 항목 상세보기 (최초 5개)")
+        for i, m in enumerate(merged_msgs[:5], start=1):
+            print(f"--- 메시지 #{i} ---")
+            print(f"timestamp : {m.get('timestamp')}")
+            print(f"speaker   : {m.get('speaker')}")
+            print(f"text      : {m.get('text')}")
+            remaining = {k: v for k, v in m.items() if k not in ['timestamp','speaker','text']}
+            print("그 외 필드:", remaining)
+            print()
+        # ───────────── run_merge 직후 디버깅 코드 끝 ─────────────
+        
+        # ─────────────────────────────────────────────────────────────
+        # (1) “최종 정제된 문장” 리스트 생성 (run_merge 이후)
+        texts = [
+            item["text"]
+            for item in merged_msgs
+            if item.get("text") and item["text"].strip()
+        ]
+
+        # (2) 형태소 분석기로 각 문장에서 명사만 추출 → 토큰화된 문장 리스트
+        okt = Okt()
+        tokenized_texts = [okt.nouns(txt) for txt in texts]
+
+        # ─────────────── LDA 실행 전 예외 처리 ───────────────
+        # tokenized_texts 자체가 비어 있거나,
+        # tokenized_texts 내의 모든 요소가 빈 리스트일 때 LDA를 실행하면 오류 발생하므로
+        # 이 경우 lda_topics를 빈 리스트로 설정하고 건너뜁니다.
+        if not tokenized_texts or all(len(tokens) == 0 for tokens in tokenized_texts):
+            # LDA를 돌릴 문장이 없으므로, 빈 결과를 할당
+            lda_topics = []
+            wc_filenames = []
+        else:
+            # (3) Gensim Dictionary + Corpus(BOW) 생성
+            dictionary = corpora.Dictionary(tokenized_texts)
+            corpus = [dictionary.doc2bow(tokens) for tokens in tokenized_texts]
+
+            # (4) LDA 모델 학습 (토픽 수·패스 수는 필요에 맞게 조절 가능)
+            lda_model = LdaModel(
+                corpus=corpus,
+                id2word=dictionary,
+                num_topics=5,
+                passes=10,
+                random_state=42
+            )
+
+            # (5) 토픽 결과 추출
+            topics = lda_model.print_topics(num_words=5)
+            lda_topics = []
+            for idx, topic_string in topics:
+                lda_topics.append({
+                    "topic_id": idx + 1,    # 화면에 보여줄 때는 1부터 시작
+                    "keywords": topic_string
+                })
+        # ─────────────────────────────────────────────────────────────
                 
+        # ───────────────── 워드클라우드 생성 코드 시작 ─────────────────
+
+        # 워드클라우드를 저장할 디렉토리 (static/wordclouds)
+        wc_folder = os.path.join(app.config['GRAPH_FOLDER'], 'wordclouds')
+        os.makedirs(wc_folder, exist_ok=True)
+
+        # 한글 폰트 경로: 환경에 맞게 수정해주세요.
+        # macOS 예시: '/Library/Fonts/AppleGothic.ttf'
+        # Windows 예시: 'C:/Windows/Fonts/malgun.ttf'
+        FONT_PATH = '/Library/Fonts/AppleGothic.ttf'
+
+        # 토픽 개수 (lda_model.num_topics) 만큼 워드클라우드 생성
+        num_topics = lda_model.num_topics
+        wc_filenames = []  # 생성된 이미지 파일명을 차례대로 저장할 리스트
+
+        for topic_id in range(min(3, num_topics)):
+            # 각 토픽에서 상위 30개 단어+가중치 추출
+            topic_terms = lda_model.show_topic(topic_id, topn=30)
+            # topic_terms 예: [('정산', 0.05), ('요청', 0.03), …]
+
+            # 워드클라우드에 넘길 빈도 사전 생성
+            freq_dict = { word: float(weight) for word, weight in topic_terms }
+
+            # WordCloud 객체 생성 및 빈도 사전 반영
+            wc = WordCloud(
+                background_color='white',
+                font_path=FONT_PATH,
+                width=800,
+                height=400
+            ).generate_from_frequencies(freq_dict)
+
+            # 파일명: topic_1.png, topic_2.png, … 형태
+            file_name = f"topic_{topic_id+1}.png"
+            save_path = os.path.join(wc_folder, file_name)
+
+            # 이미지 파일로 저장
+            wc.to_file(save_path)
+
+            # 템플릿에 넘겨줄 때는 'wordclouds/topic_1.png' 경로로 사용
+            wc_filenames.append(os.path.join('wordclouds', file_name))
+        # ───────────────── 워드클라우드 생성 코드 끝 ─────────────────
+        
         # ✅ 최종 진행률 100%로 설정 (완료 표시)
         progress_data["progress"] = 100
 
@@ -239,7 +401,9 @@ def index():
                            table_html=table_html,
                            top_styles=top_styles,
                            graph_filename=graph_filename,
-                           speaker_stats=speaker_stats)
+                           speaker_stats=speaker_stats,
+                           lda_topics = lda_topics,
+                           wc_filenames = wc_filenames)
     
 # ✅ 진행률 조회용 route 추가
 @app.route('/progress', methods=['GET'])
